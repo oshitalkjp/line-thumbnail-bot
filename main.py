@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import init_db, get_user, create_user, add_credits, decrement_credit, set_pending_prompt, get_pending_prompt, clear_pending_prompt
 from image_gen import generate_thumbnail
-from gcs_utils import upload_to_gcs
+from stripe_utils import handle_stripe_webhook, get_payment_link
 
 load_dotenv()
 
@@ -20,7 +20,6 @@ load_dotenv()
 creds_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if creds_json:
     import tempfile
-    # Create a temp file to store the credentials
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp:
         temp.write(creds_json)
         temp_path = temp.name
@@ -44,7 +43,7 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# Initialize DB (still needed for user tracking, but not credits)
+# Initialize DB
 init_db()
 
 @app.post("/callback")
@@ -56,13 +55,24 @@ async def callback(request: Request, x_line_signature: str = Header(None)):
         raise HTTPException(status_code=400, detail="Invalid signature")
     return "OK"
 
+@app.post("/stripe_webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    try:
+        handle_stripe_webhook(payload, sig_header)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return "OK"
+
 @handler.add(FollowEvent)
 def handle_follow(event):
     user_id = event.source.user_id
     create_user(user_id)
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text="登録ありがとうございます！\nYouTubeサムネイル生成Botです。\n\n作りたいサムネイルのイメージを文章で送ってください。\n\n(現在はテストモードで回数無制限です)")
+        TextSendMessage(text="登録ありがとうございます！\nYouTubeサムネイル生成Botです。\n\n作りたいサムネイルのイメージを文章で送ってください。\n\n初回は1回無料で生成できます。\nその後は10回980円で追加できます。")
     )
 
 @handler.add(MessageEvent, message=TextMessage)
@@ -85,7 +95,15 @@ def handle_message(event):
             )
             return
 
-        # Always Generate (No Credit Check)
+        # Credit Check
+        if user["credits"] <= 0:
+            payment_link = get_payment_link(user_id)
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"チケットが不足しています。\nこちらから購入してください（10回分 980円）:\n{payment_link}")
+            )
+            return
+
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=f"「{pending_prompt}」で画像を生成しています...少々お待ちください（約10-20秒）")
@@ -98,14 +116,14 @@ def handle_message(event):
             image_url = upload_to_gcs(image_path)
             
             if image_url:
-                # decrement_credit(user_id) # Disabled
+                decrement_credit(user_id) # Enable credit deduction
                 clear_pending_prompt(user_id)
                 
-                # Send Image and Text (Use Push Message because Reply Token is consumed)
+                # Send Image and Text (Use Push Message)
                 line_bot_api.push_message(
                     user_id,
                     [
-                        TextSendMessage(text="生成完了！"),
+                        TextSendMessage(text=f"生成完了！\n残りチケット: {user['credits'] - 1}枚"),
                         ImageSendMessage(original_content_url=image_url, preview_image_url=image_url)
                     ]
                 )
