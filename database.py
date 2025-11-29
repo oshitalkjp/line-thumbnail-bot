@@ -13,9 +13,16 @@ def init_db():
         line_user_id TEXT PRIMARY KEY,
         credits INTEGER DEFAULT 1,
         is_free_trial_used BOOLEAN DEFAULT 0,
+        pending_prompt TEXT,
         created_at DATETIME
     )''')
     
+    # Check if pending_prompt column exists (migration for existing db)
+    try:
+        c.execute("SELECT pending_prompt FROM users LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE users ADD COLUMN pending_prompt TEXT")
+
     # Transactions table
     c.execute('''CREATE TABLE IF NOT EXISTS transactions (
         id TEXT PRIMARY KEY,
@@ -51,6 +58,22 @@ def create_user(line_user_id):
         pass # User already exists
     conn.close()
 
+def set_pending_prompt(line_user_id, prompt):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE users SET pending_prompt = ? WHERE line_user_id = ?", (prompt, line_user_id))
+    conn.commit()
+    conn.close()
+
+def get_pending_prompt(line_user_id):
+    user = get_user(line_user_id)
+    if user:
+        return user.get("pending_prompt")
+    return None
+
+def clear_pending_prompt(line_user_id):
+    set_pending_prompt(line_user_id, None)
+
 def add_credits(line_user_id, amount):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -61,7 +84,7 @@ def add_credits(line_user_id, amount):
 def decrement_credit(line_user_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("UPDATE users SET credits = credits - 1, is_free_trial_used = 1 WHERE line_user_id = ?", (line_user_id,))
+    c.execute("UPDATE users SET credits = credits - 1, is_free_trial_used = 1, pending_prompt = NULL WHERE line_user_id = ?", (line_user_id,))
     conn.commit()
     conn.close()
 
