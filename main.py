@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import init_db, get_user, create_user, add_credits, decrement_credit, set_pending_prompt, get_pending_prompt, clear_pending_prompt
 from image_gen import generate_thumbnail
-from imgur_utils import upload_to_imgur
+from drive_utils import upload_to_drive
 
 load_dotenv()
 
@@ -74,8 +74,8 @@ def handle_message(event):
         try:
             image_path = generate_thumbnail(pending_prompt)
             
-            # Upload to Imgur
-            image_url = upload_to_imgur(image_path)
+            # Upload to Google Drive
+            image_url = upload_to_drive(image_path)
             
             if image_url:
                 # decrement_credit(user_id) # Disabled

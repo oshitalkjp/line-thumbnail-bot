@@ -76,6 +76,7 @@ def generate_thumbnail(user_text: str) -> str:
     output_path = os.path.join(output_dir, filename)
     
     try:
+        print(f"Sending request to Imagen 3 with prompt: {english_prompt[:50]}...")
         response = client.models.generate_images(
             model=IMAGE_MODEL_ID,
             prompt=english_prompt,
@@ -89,10 +90,14 @@ def generate_thumbnail(user_text: str) -> str:
         
         if response.generated_images:
             img_data = response.generated_images[0].image.image_bytes
+            print(f"Image generated! Size: {len(img_data)} bytes")
+            
             with open(output_path, "wb") as f:
                 f.write(img_data)
+            print(f"Image saved locally to: {output_path}")
             return output_path
         else:
+            print("Imagen returned no images.")
             raise Exception("No image generated")
             
     except Exception as e:

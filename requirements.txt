@@ -5,3 +5,4 @@ stripe
 python-dotenv
 google-genai
 requests
+google-api-python-client
