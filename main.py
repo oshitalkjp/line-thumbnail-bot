@@ -10,9 +10,8 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import init_db, get_user, create_user, add_credits, decrement_credit, set_pending_prompt, get_pending_prompt, clear_pending_prompt
-from image_gen import generate_thumbnail
-from stripe_utils import create_checkout_session, handle_stripe_webhook
-from imgur_utils import upload_to_imgur
+# ... (imports)
+# Removed Stripe imports
 
 load_dotenv()
 
@@ -25,7 +24,7 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# Initialize DB
+# Initialize DB (still needed for user tracking, but not credits)
 init_db()
 
 @app.post("/callback")
@@ -43,7 +42,7 @@ def handle_follow(event):
     create_user(user_id)
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text="登録ありがとうございます！\nYouTubeサムネイル生成Botです。\n\n作りたいサムネイルのイメージを文章で送ってください。\n\n初回は1回無料で生成できます。\nその後は10回980円で追加できます。")
+        TextSendMessage(text="登録ありがとうございます！\nYouTubeサムネイル生成Botです。\n\n作りたいサムネイルのイメージを文章で送ってください。\n\n(現在はテストモードで回数無制限です)")
     )
 
 @handler.add(MessageEvent, message=TextMessage)
@@ -66,48 +65,40 @@ def handle_message(event):
             )
             return
 
-        if user["credits"] > 0:
-            # Generate Image
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=f"「{pending_prompt}」で画像を生成しています...少々お待ちください（約10-20秒）")
-            )
+        # Always Generate (No Credit Check)
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f"「{pending_prompt}」で画像を生成しています...少々お待ちください（約10-20秒）")
+        )
+        
+        try:
+            image_path = generate_thumbnail(pending_prompt)
             
-            try:
-                image_path = generate_thumbnail(pending_prompt)
+            # Upload to Imgur
+            image_url = upload_to_imgur(image_path)
+            
+            if image_url:
+                # decrement_credit(user_id) # Disabled
+                clear_pending_prompt(user_id)
                 
-                # Upload to Imgur
-                image_url = upload_to_imgur(image_path)
-                
-                if image_url:
-                    decrement_credit(user_id) # This also clears pending_prompt
-                    remaining = user["credits"] - 1
-                    
-                    # Send Image and Text
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        [
-                            TextSendMessage(text=f"生成完了！\n残りクレジット: {remaining}"),
-                            ImageSendMessage(original_content_url=image_url, preview_image_url=image_url)
-                        ]
-                    )
-                else:
-                    line_bot_api.push_message(
-                        user_id,
-                        TextSendMessage(text="画像のアップロードに失敗しました。")
-                    )
-                
-            except Exception as e:
+                # Send Image and Text
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    [
+                        TextSendMessage(text="生成完了！"),
+                        ImageSendMessage(original_content_url=image_url, preview_image_url=image_url)
+                    ]
+                )
+            else:
                 line_bot_api.push_message(
                     user_id,
-                    TextSendMessage(text=f"エラーが発生しました: {str(e)}")
+                    TextSendMessage(text="画像のアップロードに失敗しました。")
                 )
-        else:
-            # Payment Link
-            checkout_url = create_checkout_session(user_id)
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=f"クレジットが不足しています。\nこちらからチャージしてください（980円/10回）:\n{checkout_url}")
+            
+        except Exception as e:
+            line_bot_api.push_message(
+                user_id,
+                TextSendMessage(text=f"エラーが発生しました: {str(e)}")
             )
             
     # 2. Handle Cancellation "いいえ"
@@ -125,17 +116,6 @@ def handle_message(event):
             event.reply_token,
             TextSendMessage(text=f"「{user_text}」\nこの内容で画像を生成しますか？\n(はい/いいえ)")
         )
-
-@app.post("/stripe_webhook")
-async def stripe_webhook(request: Request):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-    
-    try:
-        handle_stripe_webhook(payload, sig_header)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return "OK"
 
 if __name__ == "__main__":
     import uvicorn
