@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import init_db, get_user, create_user, add_credits, decrement_credit, set_pending_prompt, get_pending_prompt, clear_pending_prompt
-# ... (imports)
-# Removed Stripe imports
+from image_gen import generate_thumbnail
+from imgur_utils import upload_to_imgur
 
 load_dotenv()
 
