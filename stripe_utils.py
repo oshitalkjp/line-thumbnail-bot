@@ -13,7 +13,7 @@ def get_payment_link(line_user_id):
     # Actually, for Payment Links, we pass client_reference_id as a query param.
     # URL: https://buy.stripe.com/fZu5kC7kK1vJ3CF7HY?client_reference_id={line_user_id}
     
-    payment_link = "https://buy.stripe.com/fZu5kC7kK1vJ3CF7HY"
+    payment_link = "https://buy.stripe.com/fZu5kC7kK1vJ3CF7HY8AE00"
     return f"{payment_link}?client_reference_id={line_user_id}"
 
 def handle_stripe_webhook(payload, sig_header):

@@ -84,7 +84,9 @@ def add_credits(line_user_id, amount):
 def decrement_credit(line_user_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    print(f"DB: Decrementing credit for {line_user_id}")
     c.execute("UPDATE users SET credits = credits - 1, is_free_trial_used = 1, pending_prompt = NULL WHERE line_user_id = ?", (line_user_id,))
+    print(f"DB: Rows updated: {c.rowcount}")
     conn.commit()
     conn.close()
 
