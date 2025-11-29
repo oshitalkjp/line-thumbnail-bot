@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import init_db, get_user, create_user, add_credits, decrement_credit, set_pending_prompt, get_pending_prompt, clear_pending_prompt
 from image_gen import generate_thumbnail
 from stripe_utils import handle_stripe_webhook, get_payment_link
+from gcs_utils import upload_to_gcs
 
 load_dotenv()
 
