@@ -4,8 +4,8 @@ from google import genai
 from google.genai import types
 
 # Configuration
-IMAGE_MODEL_ID = "imagen-3.0-generate-002"
-TEXT_MODEL_ID = "gemini-2.0-flash"
+IMAGE_MODEL_ID = "imagen-3.0-generate-001"
+TEXT_MODEL_ID = "gemini-1.5-pro-002"
 
 _client = None
 
@@ -38,37 +38,15 @@ def get_client():
 
 def generate_thumbnail(user_text: str) -> str:
     """
-    Generates a YouTube thumbnail based on user text.
-    Returns the path to the generated image.
+    Generates a YouTube thumbnail using Gemini 3 Pro Image Preview.
     """
     client = get_client()
     
-    # 1. Refine Prompt with Gemini
-    # We ask Gemini to create a good visual prompt for Imagen
-    prompt_refinement_system_instruction = """
-    You are an expert YouTube Thumbnail designer.
-    Convert the user's request into a highly detailed English prompt for Imagen 3.
-    The style should be: "High quality, 8K, YouTube Thumbnail, catchy, vibrant colors".
-    
-    Output ONLY the English prompt string.
-    """
-    
-    try:
-        response = client.models.generate_content(
-            model=TEXT_MODEL_ID,
-            contents=[prompt_refinement_system_instruction, user_text],
-            config=types.GenerateContentConfig(
-                temperature=0.7
-            )
-        )
-        english_prompt = response.text.strip()
-        print(f"Generated Prompt: {english_prompt}")
-    except Exception as e:
-        print(f"Gemini Error: {e}")
-        # Fallback to user text if Gemini fails
-        english_prompt = f"YouTube Thumbnail, {user_text}"
+    # Model ID requested by user
+    # Note: This might require an API Key if not available on Vertex AI yet.
+    # We try to use it with the existing Vertex AI client.
+    MODEL_ID = "gemini-3-pro-image-preview"
 
-    # 2. Generate Image with Imagen 3
     output_dir = os.path.join(os.path.dirname(__file__), "static", "generated")
     os.makedirs(output_dir, exist_ok=True)
     
@@ -76,30 +54,50 @@ def generate_thumbnail(user_text: str) -> str:
     output_path = os.path.join(output_dir, filename)
     
     try:
-        print(f"Sending request to Imagen 3 with prompt: {english_prompt[:50]}...")
-        response = client.models.generate_images(
-            model=IMAGE_MODEL_ID,
-            prompt=english_prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="16:9",
-                safety_filter_level="BLOCK_MEDIUM_AND_ABOVE",
-                person_generation="ALLOW_ADULT"
+        print(f"Sending request to {MODEL_ID} with prompt: {user_text[:50]}...")
+        
+        # Using generate_content as per user's snippet
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=f"Generate a high quality, 8K, YouTube Thumbnail: {user_text}",
+            config=types.GenerateContentConfig(
+                image_config=types.ImageConfig(
+                    aspect_ratio="16:9",
+                    image_size="4K" # Or "2048x2048" depending on support, user snippet said 4K
+                )
             )
         )
         
-        if response.generated_images:
-            img_data = response.generated_images[0].image.image_bytes
-            print(f"Image generated! Size: {len(img_data)} bytes")
-            
+        # Extract image from response
+        # The snippet uses: image_parts = [part for part in response.parts if part.inline_data]
+        # We need to adapt this to the response object structure of google-genai
+        
+        image_data = None
+        if response.parts:
+            for part in response.parts:
+                if part.inline_data:
+                    image_data = part.inline_data.data
+                    break
+        
+        # If not found in parts, check if it's directly in candidates (depending on SDK version)
+        if not image_data and response.candidates:
+             for part in response.candidates[0].content.parts:
+                 if part.inline_data:
+                     image_data = part.inline_data.data
+                     break
+
+        if image_data:
+            print(f"Image generated! Size: {len(image_data)} bytes")
             with open(output_path, "wb") as f:
-                f.write(img_data)
+                f.write(image_data)
             print(f"Image saved locally to: {output_path}")
             return output_path
         else:
-            print("Imagen returned no images.")
+            print("Gemini returned no inline image data.")
+            # Fallback or detailed error logging
+            print(f"Response: {response}")
             raise Exception("No image generated")
-            
+
     except Exception as e:
-        print(f"Imagen Error: {e}")
+        print(f"Gemini 3 Generation Error: {e}")
         raise e
