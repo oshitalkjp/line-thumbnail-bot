@@ -6,6 +6,7 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, ImageSendMessage
 from dotenv import load_dotenv
 
+#
 # Add parent dir to path to import other modules if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
