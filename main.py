@@ -96,6 +96,7 @@ def handle_message(event):
             return
 
         # Credit Check
+        print(f"User {user_id} credits before: {user['credits']}")
         if user["credits"] <= 0:
             payment_link = get_payment_link(user_id)
             line_bot_api.reply_message(
@@ -114,20 +115,28 @@ def handle_message(event):
             
             # Upload to Google Cloud Storage
             image_url = upload_to_gcs(image_path)
+            print(f"Upload result URL: {image_url}")
             
             if image_url:
                 decrement_credit(user_id) # Enable credit deduction
+                print(f"Decremented credit for {user_id}")
+                
+                # Check new balance
+                updated_user = get_user(user_id)
+                print(f"User {user_id} credits after: {updated_user['credits']}")
+                
                 clear_pending_prompt(user_id)
                 
                 # Send Image and Text (Use Push Message)
                 line_bot_api.push_message(
                     user_id,
                     [
-                        TextSendMessage(text=f"生成完了！\n残りチケット: {user['credits'] - 1}枚"),
+                        TextSendMessage(text=f"生成完了！\n残りチケット: {updated_user['credits']}枚"),
                         ImageSendMessage(original_content_url=image_url, preview_image_url=image_url)
                     ]
                 )
             else:
+                print("Upload failed, credit not deducted.")
                 line_bot_api.push_message(
                     user_id,
                     TextSendMessage(text="画像のアップロードに失敗しました。")
