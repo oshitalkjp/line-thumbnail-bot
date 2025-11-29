@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+line-bot-sdk
+stripe
+python-dotenv
+google-genai
