@@ -82,9 +82,9 @@ def handle_message(event):
                 # decrement_credit(user_id) # Disabled
                 clear_pending_prompt(user_id)
                 
-                # Send Image and Text
-                line_bot_api.reply_message(
-                    event.reply_token,
+                # Send Image and Text (Use Push Message because Reply Token is consumed)
+                line_bot_api.push_message(
+                    user_id,
                     [
                         TextSendMessage(text="生成完了！"),
                         ImageSendMessage(original_content_url=image_url, preview_image_url=image_url)
