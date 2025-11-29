@@ -16,6 +16,18 @@ from gcs_utils import upload_to_gcs
 
 load_dotenv()
 
+# Setup Google Credentials for GCS (Service Account)
+creds_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if creds_json:
+    import tempfile
+    # Create a temp file to store the credentials
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp:
+        temp.write(creds_json)
+        temp_path = temp.name
+    
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
+    print(f"Loaded Service Account credentials to {temp_path}")
+
 app = FastAPI()
 
 # LINE Bot Setup
