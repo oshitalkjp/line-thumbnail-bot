@@ -28,7 +28,14 @@ if creds_json:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
     print(f"Loaded Service Account credentials to {temp_path}")
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI()
+
+# Mount static directory
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # LINE Bot Setup
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
