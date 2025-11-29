@@ -12,6 +12,20 @@ _client = None
 def get_client():
     global _client
     if _client is None:
+        # Handle Google Credentials from JSON string (for Render)
+        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if creds_json:
+            import tempfile
+            # Create a temp file to store the credentials
+            # We use delete=False so it persists for the process life, 
+            # but ideally we should clean it up. For this bot, it's fine.
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp:
+                temp.write(creds_json)
+                temp_path = temp.name
+            
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
+            print(f"Loaded credentials to {temp_path}")
+
         project = os.environ.get("GOOGLE_CLOUD_PROJECT", "youtube-ai-gen")
         location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
         
