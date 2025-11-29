@@ -4,3 +4,4 @@ line-bot-sdk
 stripe
 python-dotenv
 google-genai
+requests
