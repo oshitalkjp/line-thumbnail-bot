@@ -6,7 +6,7 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 DOMAIN = "http://localhost:8000" # Update this for production
 
-def create_checkout_session(line_user_id):
+def get_payment_link(line_user_id):
     # Use the static Payment Link provided by the user
     # We append client_reference_id so we know who paid
     base_url = "https://buy.stripe.com/fZu5kC7kK1vJ3CF7HY" # Note: User provided fZu5kC7kK1vJ3CF7HY8AE00 but usually these are shorter or have query params. 
